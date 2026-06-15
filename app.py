@@ -1,12 +1,14 @@
 import os
 import streamlit as st
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-load_dotenv()
+from langchain_groq import ChatGroq
 
 st.set_page_config(page_title="Blood Work Analyzer", layout="wide")
 
-llm = ChatGoogleGenerativeAI(model="gemma-4-31b-it")
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0,
+    api_key=os.environ.get("GROQ_API_KEY")
+)
 
 st.markdown("""
 <style>
@@ -50,8 +52,7 @@ with left_col:
 with right_col:
     st.subheader("Health Summary")
     health_box = st.empty()
-    health_box.markdown('<div class="scroll-box"></div>',
-                        unsafe_allow_html=True)
+    health_box.markdown('<div class="scroll-box"></div>', unsafe_allow_html=True)
 
     st.subheader("Suggested Diet Plan")
     diet_box = st.empty()
@@ -63,14 +64,10 @@ if analyze_clicked:
             st.warning("Please paste a blood work report before analyzing.")
     else:
         with st.spinner("Analyzing your blood work..."):
-
-            # Stage 1: Extract and flag abnormal values
             extraction_prompt = f"""
 You are a medical data extraction assistant.
-
 From the blood report below, extract ALL test values and classify each one as HIGH, LOW, or NORMAL
 based on the reference ranges provided in the report.
-
 Format your response as:
 - Test Name: value | Status: HIGH/LOW/NORMAL | Reference: range
 
@@ -78,12 +75,10 @@ Blood Report:
 {blood_report}
 """
             extraction_response = llm.invoke(extraction_prompt)
-            extracted_values = extraction_response.text
+            extracted_values = extraction_response.content  # ✅ fixed .text -> .content
 
-            # Stage 2: Health summary and Indian diet plan
             diet_prompt = f"""
 You are a clinical nutritionist specializing in Indian dietary habits.
-
 Based on the blood work analysis below, provide two clearly separated sections:
 
 SECTION 1 - HEALTH SUMMARY:
@@ -97,9 +92,8 @@ Blood Work Analysis:
 {extracted_values}
 """
             diet_response = llm.invoke(diet_prompt)
-            full_response = diet_response.text
+            full_response = diet_response.content  # ✅ fixed .text -> .content
 
-        # Split response into two sections
         if "SECTION 2" in full_response:
             parts = full_response.split("SECTION 2")
             health_summary = parts[0].replace(
@@ -110,7 +104,6 @@ Blood Work Analysis:
             health_summary = full_response
             diet_plan = ""
 
-        # Render into fixed-height scrollable boxes
         health_box.markdown(
             f'<div class="scroll-box">{health_summary}</div>',
             unsafe_allow_html=True
